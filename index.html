@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rykoh · Projects &amp; Services</title>
+<meta name="description" content="Recent projects and services by Rykoh.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;600&family=JetBrains+Mono:wght@400&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="site-head">
+  <div class="wrap">
+    <a class="brand" href="#">Rykoh</a>
+    <nav class="nav" aria-label="Main">
+      <a href="#" data-nav="home">Work</a>
+      <a href="#about" data-nav="about">About</a>
+      <a href="#services" data-nav="services">Services</a>
+      <a href="#contact" data-nav="contact">Contact</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- Home: the cube -->
+  <div class="view" data-view="home">
+    <div class="stage" id="stage" aria-hidden="true">
+      <div class="void-intro">
+        <span class="label">Portfolio · 2026 <span class="ph">Placeholder</span></span>
+        <h1>Things I've built, one piece at a time.</h1>
+      </div>
+      <div class="preview" id="preview" hidden>
+        <div class="pv-thumb" id="pv-thumb">Preview image</div>
+        <div class="pv-body">
+          <span class="label" id="pv-kind"></span>
+          <h3 id="pv-title"></h3>
+          <p id="pv-blurb"></p>
+          <span class="pv-go">Click to open →</span>
+          <a class="pv-open" id="pv-open" href="#">Open</a>
+        </div>
+      </div>
+    </div>
+    <div class="wrap">
+      <div class="stage-bar">
+        <p class="hint" id="hint">Click the cube to break off a piece.</p>
+        <button class="reset" id="reset" type="button" hidden>Put the cube back together</button>
+      </div>
+      <nav class="jump" aria-label="Everything on the cube">
+        <span class="label">Or jump straight to</span>
+        <ul id="jump-list"></ul>
+      </nav>
+    </div>
+  </div>
+
+  <!-- Project detail (filled from SITE data in app.js) -->
+  <div class="view" data-view="project" hidden>
+    <article class="wrap page">
+      <a class="back" href="#">← Back to the cube</a>
+      <div class="label" id="pj-kind"></div>
+      <h1 id="pj-title"></h1>
+      <p class="lede" id="pj-blurb"></p>
+      <div class="detail-top">
+        <div class="shot" id="pj-shot">Screenshot · 1600 × 1000</div>
+        <dl class="spec" id="pj-spec"></dl>
+      </div>
+      <div id="pj-sections"></div>
+      <div class="cta-row" id="pj-cta"></div>
+    </article>
+  </div>
+
+  <!-- About (the purple core) -->
+  <div class="view" data-view="about" hidden>
+    <article class="wrap page">
+      <a class="back" href="#">← Back to the cube</a>
+      <div class="about-grid">
+        <div class="portrait">Your photo · 4 : 5</div>
+        <div>
+          <span class="label">About me <span class="ph">Placeholder</span></span>
+          <h1>Hi, I'm Rykoh.</h1>
+          <p>A few sentences in your own voice: what you do, how long you've been doing it, and what kind of work you enjoy most.</p>
+          <p>Add where you're based and whether you take remote work, so people know if you're a fit before they reach out.</p>
+          <ul class="skills">
+            <li>Skill one</li><li>Skill two</li><li>Skill three</li><li>Skill four</li><li>Skill five</li>
+          </ul>
+          <div class="cta-row">
+            <a class="btn primary" href="#contact">Get in touch</a>
+            <a class="btn" href="#services">See services</a>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <!-- Services -->
+  <div class="view" data-view="services" hidden>
+    <article class="wrap page">
+      <a class="back" href="#">← Back to the cube</a>
+      <span class="label">Open for new work <span class="ph">Placeholder</span></span>
+      <h1>Services</h1>
+      <p class="lede">What you can hire me for. Every project starts with a short call to agree scope and timing.</p>
+      <div class="services">
+        <div class="service">
+          <h2>Service one</h2>
+          <p>What the client gets, and what a typical project looks like.</p>
+          <span class="price">From $— · 1–2 weeks</span>
+        </div>
+        <div class="service">
+          <h2>Service two</h2>
+          <p>A second offer, such as ongoing support or a smaller fixed-scope job.</p>
+          <span class="price">From $— / month</span>
+        </div>
+        <div class="service">
+          <h2>Service three</h2>
+          <p>Consulting, audits, or anything else you'd like to be hired for.</p>
+          <span class="price">$— / hour</span>
+        </div>
+      </div>
+      <div class="cta-row"><a class="btn primary" href="#contact">Start a project</a></div>
+    </article>
+  </div>
+
+  <!-- Contact -->
+  <div class="view" data-view="contact" hidden>
+    <article class="wrap page">
+      <a class="back" href="#">← Back to the cube</a>
+      <span class="label">Contact <span class="ph">Placeholder</span></span>
+      <h1>Have a project in mind?</h1>
+      <p class="lede">Tell me what you're building and when you need it. I usually reply within two working days.</p>
+      <div class="contact-row">
+        <span class="email" id="email">you@example.com</span>
+        <button class="copy" id="copy-email" type="button">Copy email</button>
+      </div>
+      <ul class="socials">
+        <li><a href="https://github.com/ryanstisk-byte">GitHub ↗</a></li>
+        <li><a href="#contact">LinkedIn ↗</a></li>
+      </ul>
+    </article>
+  </div>
+</main>
+
+<footer class="wrap foot">© 2026 Rykoh</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
