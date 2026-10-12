@@ -2,21 +2,18 @@
    Site content. Edit this block to change what the cube links to.
    Each fragment breaks off the cube in this order. A fragment with a
    `page` opens that page; otherwise it opens a project detail page.
-   Set `url: null` for projects that aren't public.
+   Set `url: null` for projects that aren't public. Optional: `spec` (rows
+   for the details box) and `cta` (the button label).
 ------------------------------------------------------------------- */
 var SITE = {
   core: { kind: 'About me', title: 'Hi, I\'m Rykoh', blurb: 'Who I am, what I do, and how I like to work.', page: 'about' },
   fragments: [
     {
-      id: 'project-one', kind: 'Project · 2026', title: 'Project One',
-      blurb: 'One or two sentences on the problem it solves and who it is for.',
-      year: '2026', role: 'Design & development', stack: 'Tools or tech used', status: 'Live',
-      url: 'https://example.com',
-      sections: [
-        ['The problem', 'What wasn\'t working, and for whom.'],
-        ['What I built', 'The main features and the decisions behind them.'],
-        ['Result', 'What changed once it shipped. A number helps if you have one.']
-      ]
+      id: 'youtube', kind: 'YouTube channel', title: 'YouTube',
+      blurb: 'Videos from my YouTube channel, @Rykoh-gg.',
+      spec: [['Platform', 'YouTube'], ['Channel', '@Rykoh-gg']],
+      url: 'https://www.youtube.com/@Rykoh-gg', cta: 'Watch on YouTube ↗',
+      sections: []
     },
     {
       id: 'project-two', kind: 'Project · 2026', title: 'Project Two',
@@ -75,14 +72,14 @@ var SITE = {
     document.getElementById('pj-title').textContent = p.title;
     document.getElementById('pj-blurb').textContent = p.blurb;
     var spec = document.getElementById('pj-spec'); spec.textContent = '';
-    [['Year', p.year], ['Role', p.role], ['Stack', p.stack], ['Status', p.status]].forEach(function (r) {
+    (p.spec || [['Year', p.year], ['Role', p.role], ['Stack', p.stack], ['Status', p.status]]).forEach(function (r) {
       if (!r[1]) return; spec.appendChild(el('dt', r[0])); spec.appendChild(el('dd', r[1]));
     });
     var secs = document.getElementById('pj-sections'); secs.textContent = '';
     (p.sections || []).forEach(function (s) { secs.appendChild(el('h2', s[0])); secs.appendChild(el('p', s[1])); });
     var cta = document.getElementById('pj-cta'); cta.textContent = '';
     if (p.url) {
-      var a = el('a', 'View the project ↗', 'btn primary'); a.href = p.url; a.target = '_blank'; a.rel = 'noopener';
+      var a = el('a', p.cta || 'View the project ↗', 'btn primary'); a.href = p.url; a.target = '_blank'; a.rel = 'noopener';
       cta.appendChild(a);
     } else {
       cta.appendChild(el('span', 'This project isn\'t publicly available.', 'private'));
