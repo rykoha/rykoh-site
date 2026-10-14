@@ -472,6 +472,7 @@ document.getElementById('copy-email').addEventListener('click', function () {
       f.label.classList.remove('on');
     });
     detached = 0; updateHint();
+    popArmed = !reduced;
   }
   resetBtn.addEventListener('click', reassemble);
 
@@ -556,7 +557,7 @@ document.getElementById('copy-email').addEventListener('click', function () {
   function ease(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
   var clock = new THREE.Clock(), elapsed = 0, running = true;
   var coreOpen = 0;
-  var popT = -1, POP_TIME = 0.65;   // the 1.1x 'snap' when the cube is put back together
+  var popT = -1, POP_TIME = 0.32, popArmed = false;   // the 1.1x 'snap' when the cube is put back together
   var c1 = new THREE.Vector3(), c2 = new THREE.Vector3();
   function bezier(out, p0, p1, p2, p3, t) {
     var u = 1 - t, a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t;
@@ -587,11 +588,13 @@ document.getElementById('copy-email').addEventListener('click', function () {
       // Swell quickly to 1.1x, then ease back down to normal size.
       popT += dt;
       var u = Math.min(1, popT / POP_TIME);
-      var swell = u < 0.25 ? 1 - Math.pow(1 - u / 0.25, 3) : 1 - ease((u - 0.25) / 0.75);
+      var swell = u < 0.3 ? 1 - Math.pow(1 - u / 0.3, 3) : 1 - ease((u - 0.3) / 0.7);
       s *= 1 + 0.1 * swell;
       if (u >= 1) popT = -1;
     }
     cube.scale.setScalar(s);
+    // Start the pop just before the pieces land, so it reads as the impact.
+    if (popArmed && frags.every(function (x) { return x.mode !== 'returning' || x.t >= 0.82; })) { popArmed = false; popT = 0; }
 
     // Core pulse.
     var pulse = reduced ? 0 : Math.sin(elapsed * 2.2) * 0.15;
@@ -616,9 +619,7 @@ document.getElementById('copy-email').addEventListener('click', function () {
         g.quaternion.copy(f.fromQuat).slerp(f.toQuat, k);
         g.scale.setScalar(f.fromScale + (f.toScale - f.fromScale) * k);
         if (f.t >= 1) {
-          var wasReturning = f.mode === 'returning';
           f.mode = f.mode === 'flying' ? 'parked' : 'home';
-          if (wasReturning && !reduced && !frags.some(function (x) { return x.mode === 'returning'; })) popT = 0;
         }
       } else if (f.mode === 'parked') {
         f.spin += dt * (reduced ? 0 : 0.3);
