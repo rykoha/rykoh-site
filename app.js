@@ -228,13 +228,13 @@ document.getElementById('copy-email').addEventListener('click', function () {
   // Build one instanced mesh per chunk, plus one for the base cube.
   var voxelGeo = new THREE.BoxGeometry(VS * 0.965, VS * 0.965, VS * 0.965);
   // Seam faces (every voxel face that isn't on the cube's outside) can glow purple, so light shows through the cracks.
-  var seamFlash = { value: 0 }, seamColor = { value: new THREE.Color(0x8a3dff) };
+  var seamSpread = { value: 0 }, voxelGrow = { value: 0 }, seamFlash = { value: 0 }, seamColor = { value: new THREE.Color(0x8a3dff) };
   function voxelMaterial(centre) {
     var mat = new THREE.MeshStandardMaterial({ color: 0x8e9095, roughness: 0.82, metalness: 0.04 });
     mat.onBeforeCompile = function (sh) {
-      sh.uniforms.uFlash = seamFlash; sh.uniforms.uFlashColor = seamColor; sh.uniforms.uOffset = { value: centre.clone() };
-      sh.vertexShader = 'uniform vec3 uOffset;\nvarying float vSeam;\n' + sh.vertexShader.replace('#include <begin_vertex>',
-        '#include <begin_vertex>\nvec3 seamC = uOffset;\n#ifdef USE_INSTANCING\nseamC += instanceMatrix[3].xyz;\n#endif\nvSeam = dot(seamC, objectNormal);');
+      sh.uniforms.uFlash = seamFlash; sh.uniforms.uSpread = seamSpread; sh.uniforms.uGrow = voxelGrow; sh.uniforms.uFlashColor = seamColor; sh.uniforms.uOffset = { value: centre.clone() };
+      sh.vertexShader = 'uniform vec3 uOffset;\nuniform float uSpread;\nuniform float uGrow;\nvarying float vSeam;\n' + sh.vertexShader.replace('#include <begin_vertex>',
+        '#include <begin_vertex>\nvec3 seamC = uOffset;\n#ifdef USE_INSTANCING\nseamC += instanceMatrix[3].xyz;\n#endif\nvSeam = dot(seamC, objectNormal);\ntransformed *= 1.0 + uGrow;\ntransformed += seamC * uSpread;');
       sh.fragmentShader = 'uniform float uFlash;\nuniform vec3 uFlashColor;\nvarying float vSeam;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>',
         '#include <emissivemap_fragment>\nfloat seam = uFlash * step(vSeam, ' + ((H - 1) * VS + VS / 2).toFixed(3) + ');\n' +
         'diffuseColor.rgb *= 1.0 - seam;\ntotalEmissiveRadiance += uFlashColor * seam;');
@@ -569,7 +569,9 @@ document.getElementById('copy-email').addEventListener('click', function () {
   function ease(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
   var clock = new THREE.Clock(), elapsed = 0, running = true;
   var coreOpen = 0;
-  var POP_ON_REASSEMBLE = true;                        // the 1.1x 'snap' when the cube is put back together
+  // The 'snap' when the cube is put back together. 'scale' grows the whole cube 1.1x;
+  // 'spread' pushes the voxels apart by POP_SPREAD while each one grows by POP_GROW.
+  var POP_ON_REASSEMBLE = true, POP_STYLE = 'spread', POP_GROW = 0.1, POP_SPREAD = 0.2;
   var popT = -1, POP_TIME = 0.65;
   var flashT = -1, FLASH_UP = 0.08, FLASH_DOWN = 1.0, FLASH_PEAK = 12;   // purple light through the cracks after the snap
   var c1 = new THREE.Vector3(), c2 = new THREE.Vector3();
@@ -603,8 +605,8 @@ document.getElementById('copy-email').addEventListener('click', function () {
       popT += dt;
       var u = Math.min(1, popT / POP_TIME);
       var swell = u < 0.25 ? 1 - Math.pow(1 - u / 0.25, 3) : 1 - ease((u - 0.25) / 0.75);
-      s *= 1 + 0.1 * swell;
-      if (u >= 1) popT = -1;
+      if (POP_STYLE === 'spread') { seamSpread.value = POP_SPREAD * swell; voxelGrow.value = POP_GROW * swell; } else s *= 1 + 0.1 * swell;
+      if (u >= 1) { popT = -1; seamSpread.value = 0; voxelGrow.value = 0; }
     }
     cube.scale.setScalar(s);
 
