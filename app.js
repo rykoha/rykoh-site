@@ -556,6 +556,7 @@ document.getElementById('copy-email').addEventListener('click', function () {
   function ease(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
   var clock = new THREE.Clock(), elapsed = 0, running = true;
   var coreOpen = 0;
+  var popT = -1, POP_TIME = 0.65;   // the 1.1x 'snap' when the cube is put back together
   var c1 = new THREE.Vector3(), c2 = new THREE.Vector3();
   function bezier(out, p0, p1, p2, p3, t) {
     var u = 1 - t, a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t;
@@ -582,6 +583,14 @@ document.getElementById('copy-email').addEventListener('click', function () {
     cube.rotation.x = reduced ? 0 : Math.sin(elapsed * 0.25) * 0.06;
     var s = 1;
     if (nudge > 0) { nudge = Math.max(0, nudge - dt * 3); s = 1 + Math.sin(nudge * Math.PI) * 0.035; }
+    if (popT >= 0) {
+      // Swell quickly to 1.1x, then ease back down to normal size.
+      popT += dt;
+      var u = Math.min(1, popT / POP_TIME);
+      var swell = u < 0.25 ? 1 - Math.pow(1 - u / 0.25, 3) : 1 - ease((u - 0.25) / 0.75);
+      s *= 1 + 0.1 * swell;
+      if (u >= 1) popT = -1;
+    }
     cube.scale.setScalar(s);
 
     // Core pulse.
@@ -606,7 +615,11 @@ document.getElementById('copy-email').addEventListener('click', function () {
         bezier(g.position, f.fromPos, c1, c2, f.toPos, k);
         g.quaternion.copy(f.fromQuat).slerp(f.toQuat, k);
         g.scale.setScalar(f.fromScale + (f.toScale - f.fromScale) * k);
-        if (f.t >= 1) f.mode = f.mode === 'flying' ? 'parked' : 'home';
+        if (f.t >= 1) {
+          var wasReturning = f.mode === 'returning';
+          f.mode = f.mode === 'flying' ? 'parked' : 'home';
+          if (wasReturning && !reduced && !frags.some(function (x) { return x.mode === 'returning'; })) popT = 0;
+        }
       } else if (f.mode === 'parked') {
         f.spin += dt * (reduced ? 0 : 0.3);
         g.position.set(f.toPos.x, f.toPos.y + (reduced ? 0 : Math.sin(elapsed * 1.1 + f.index) * 0.06), 0);
