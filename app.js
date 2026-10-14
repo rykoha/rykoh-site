@@ -227,14 +227,27 @@ document.getElementById('copy-email').addEventListener('click', function () {
 
   // Build one instanced mesh per chunk, plus one for the base cube.
   var voxelGeo = new THREE.BoxGeometry(VS * 0.965, VS * 0.965, VS * 0.965);
-  function voxelMaterial() { return new THREE.MeshStandardMaterial({ color: 0x8e9095, roughness: 0.82, metalness: 0.04 }); }
+  // Seam faces (every voxel face that isn't on the cube's outside) can glow purple, so light shows through the cracks.
+  var seamFlash = { value: 0 }, seamColor = { value: new THREE.Color(0x8a3dff) };
+  function voxelMaterial(centre) {
+    var mat = new THREE.MeshStandardMaterial({ color: 0x8e9095, roughness: 0.82, metalness: 0.04 });
+    mat.onBeforeCompile = function (sh) {
+      sh.uniforms.uFlash = seamFlash; sh.uniforms.uFlashColor = seamColor; sh.uniforms.uOffset = { value: centre.clone() };
+      sh.vertexShader = 'uniform vec3 uOffset;\nvarying float vSeam;\n' + sh.vertexShader.replace('#include <begin_vertex>',
+        '#include <begin_vertex>\nvec3 seamC = uOffset;\n#ifdef USE_INSTANCING\nseamC += instanceMatrix[3].xyz;\n#endif\nvSeam = dot(seamC, objectNormal);');
+      sh.fragmentShader = 'uniform float uFlash;\nuniform vec3 uFlashColor;\nvarying float vSeam;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>',
+        '#include <emissivemap_fragment>\nfloat seam = uFlash * step(vSeam, ' + ((H - 1) * VS + VS / 2).toFixed(3) + ');\n' +
+        'diffuseColor.rgb *= 1.0 - seam;\ntotalEmissiveRadiance += uFlashColor * seam;');
+    };
+    return mat;
+  }
   var cube = new THREE.Group();
   cube.rotation.y = 0.65;
   scene.add(cube);
   var m4 = new THREE.Matrix4();
 
   function buildMesh(list, centre) {
-    var mesh = new THREE.InstancedMesh(voxelGeo, voxelMaterial(), list.length);
+    var mesh = new THREE.InstancedMesh(voxelGeo, voxelMaterial(centre), list.length);
     mesh.castShadow = true; mesh.receiveShadow = true;
     list.forEach(function (k, n) {
       var x = k % N, y = Math.floor(k / N) % N, z = Math.floor(k / (N * N));
@@ -472,7 +485,6 @@ document.getElementById('copy-email').addEventListener('click', function () {
       f.label.classList.remove('on');
     });
     detached = 0; updateHint();
-    popArmed = !reduced;
   }
   resetBtn.addEventListener('click', reassemble);
 
@@ -557,7 +569,9 @@ document.getElementById('copy-email').addEventListener('click', function () {
   function ease(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
   var clock = new THREE.Clock(), elapsed = 0, running = true;
   var coreOpen = 0;
-  var popT = -1, POP_TIME = 0.32, popArmed = false;   // the 1.1x 'snap' when the cube is put back together
+  var POP_ON_REASSEMBLE = true;                        // the 1.1x 'snap' when the cube is put back together
+  var popT = -1, POP_TIME = 0.65;
+  var flashT = -1, FLASH_UP = 0.08, FLASH_DOWN = 1.0, FLASH_PEAK = 12;   // purple light through the cracks after the snap
   var c1 = new THREE.Vector3(), c2 = new THREE.Vector3();
   function bezier(out, p0, p1, p2, p3, t) {
     var u = 1 - t, a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t;
@@ -588,19 +602,26 @@ document.getElementById('copy-email').addEventListener('click', function () {
       // Swell quickly to 1.1x, then ease back down to normal size.
       popT += dt;
       var u = Math.min(1, popT / POP_TIME);
-      var swell = u < 0.3 ? 1 - Math.pow(1 - u / 0.3, 3) : 1 - ease((u - 0.3) / 0.7);
+      var swell = u < 0.25 ? 1 - Math.pow(1 - u / 0.25, 3) : 1 - ease((u - 0.25) / 0.75);
       s *= 1 + 0.1 * swell;
       if (u >= 1) popT = -1;
     }
     cube.scale.setScalar(s);
-    // Start the pop just before the pieces land, so it reads as the impact.
-    if (popArmed && frags.every(function (x) { return x.mode !== 'returning' || x.t >= 0.82; })) { popArmed = false; popT = 0; }
 
     // Core pulse.
     var pulse = reduced ? 0 : Math.sin(elapsed * 2.2) * 0.15;
     // The core only lights the cube's insides once chunks have come away, so it doesn't bleed through the gaps.
     coreOpen += ((detached / frags.length) - coreOpen) * Math.min(1, dt * 2);
-    coreLight.intensity = (1.2 + pulse * 1.5) * coreOpen;
+    var flash = 0;
+    if (flashT >= 0) {
+      // Quick purple burst from the core that leaks out through the seams, then fades.
+      flashT += dt;
+      flash = flashT < FLASH_UP ? flashT / FLASH_UP : Math.pow(Math.max(0, 1 - (flashT - FLASH_UP) / FLASH_DOWN), 2);
+      if (flashT >= FLASH_UP + FLASH_DOWN) flashT = -1;
+    }
+    coreLight.intensity = (1.2 + pulse * 1.5) * coreOpen + FLASH_PEAK * flash;
+    coreLight.distance = 2.4 + 2 * flash;
+    seamFlash.value = flash;
 
     frags.forEach(function (f) {
       var g = f.group;
@@ -619,7 +640,12 @@ document.getElementById('copy-email').addEventListener('click', function () {
         g.quaternion.copy(f.fromQuat).slerp(f.toQuat, k);
         g.scale.setScalar(f.fromScale + (f.toScale - f.fromScale) * k);
         if (f.t >= 1) {
+          var wasReturning = f.mode === 'returning';
           f.mode = f.mode === 'flying' ? 'parked' : 'home';
+          if (wasReturning && !reduced && !frags.some(function (x) { return x.mode === 'returning'; })) {
+            if (POP_ON_REASSEMBLE) popT = 0;
+            flashT = 0;
+          }
         }
       } else if (f.mode === 'parked') {
         f.spin += dt * (reduced ? 0 : 0.3);
