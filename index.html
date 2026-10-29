@@ -5,12 +5,35 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Rykoh · Projects &amp; Services</title>
 <meta name="description" content="Recent projects and services by Rykoh.">
+<link rel="canonical" href="https://rykoh.dev/">
+<meta name="theme-color" content="#f2f3ef">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<!-- Link previews (Discord, X, iMessage, Slack...) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Rykoh">
+<meta property="og:url" content="https://rykoh.dev/">
+<meta property="og:title" content="Rykoh · Projects &amp; Services">
+<meta property="og:description" content="Break open the cube to explore recent projects and videos by Rykoh.">
+<meta property="og:image" content="https://rykoh.dev/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A grey voxel cube breaking apart around a purple core, on a white background.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Rykoh · Projects &amp; Services">
+<meta name="twitter:description" content="Break open the cube to explore recent projects and videos by Rykoh.">
+<meta name="twitter:image" content="https://rykoh.dev/og-image.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;600&family=JetBrains+Mono:wght@400&display=swap">
 <link rel="stylesheet" href="styles.css">
+<!-- Analytics: GoatCounter (no cookies). Only counts visits on rykoh.dev; see SITE.track in app.js. -->
+<script>window.goatcounter = { no_onload: true };</script>
+<script id="gc-script" data-goatcounter="https://rykoh.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </head>
 <body>
+<a class="skip" href="#jump">Skip to the menu</a>
 
 <header class="site-head">
   <div class="wrap">
@@ -32,6 +55,7 @@
         <span class="label">Portfolio · 2026 <span class="ph">Placeholder</span></span>
         <h1>Things I've built, one piece at a time.</h1>
       </div>
+      <div class="egg-toast" id="egg-toast" role="status" hidden></div>
       <div class="preview" id="preview" hidden>
         <div class="pv-thumb" id="pv-thumb">Preview image</div>
         <div class="pv-body">
@@ -46,10 +70,15 @@
     <div class="wrap">
       <div class="stage-bar">
         <p class="hint" id="hint">Click the cube to break off a piece.</p>
-        <button class="reset" id="reset" type="button" hidden>Put the cube back together</button>
+        <div class="stage-tools">
+          <button class="reset" id="reset" type="button" hidden>Put the cube back together</button>
+          <button class="tool" id="sound-toggle" type="button" aria-pressed="false" title="Play sounds when you click the cube">Sound: off</button>
+          <button class="tool" id="skip-toggle" type="button" aria-pressed="false">Skip animation</button>
+        </div>
       </div>
-      <nav class="jump" aria-label="Everything on the cube">
-        <span class="label">Or jump straight to</span>
+      <nav class="jump" id="jump" tabindex="-1" aria-label="Everything on the cube">
+        <h2 class="plain-title">Things I've built, one piece at a time.</h2>
+        <span class="label jump-label">Or jump straight to</span>
         <ul id="jump-list"></ul>
       </nav>
     </div>

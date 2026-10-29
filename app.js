@@ -46,6 +46,26 @@ var SITE = {
 };
 
 /* ------------------------------------------------------------------
+   Analytics (GoatCounter). Counts page views and a few named events,
+   only on rykoh.dev so previews and local testing don't skew numbers.
+------------------------------------------------------------------- */
+SITE.track = function (path, title, isEvent) {
+  if (!/(^|\.)rykoh\.dev$/.test(location.hostname)) return;
+  function send() { window.goatcounter.count({ path: path, title: title || path, event: !!isEvent }); }
+  if (window.goatcounter && window.goatcounter.count) return send();
+  var tag = document.getElementById('gc-script');
+  if (tag) tag.addEventListener('load', function () { if (window.goatcounter && window.goatcounter.count) send(); });
+};
+
+// Small saved preferences (sound, skip animation). Storage can be blocked, so never rely on it.
+SITE.pref = function (key, value) {
+  try {
+    if (value === undefined) return localStorage.getItem('rykoh-' + key);
+    localStorage.setItem('rykoh-' + key, value);
+  } catch (e) { return null; }
+};
+
+/* ------------------------------------------------------------------
    Routing: #about, #services, #contact, #<fragment id>, or home.
 ------------------------------------------------------------------- */
 (function () {
@@ -57,15 +77,19 @@ var SITE = {
   function hrefFor(item) { return '#' + (item.page || item.id); }
   SITE.hrefFor = hrefFor;
 
-  // Fallback list under the cube (keyboard and no-WebGL access).
+  function el(tag, text, cls) { var e = document.createElement(tag); if (text) e.textContent = text; if (cls) e.className = cls; return e; }
+
+  // Plain menu under the cube (keyboard, touch, reduced-motion and no-WebGL access).
   var jump = document.getElementById('jump-list');
-  [SITE.core].concat(SITE.fragments).forEach(function (item) {
-    var li = document.createElement('li'), a = document.createElement('a');
-    a.href = hrefFor(item); a.textContent = item.page === 'about' ? 'About me' : item.title;
+  SITE.fragments.concat([SITE.core]).forEach(function (item) {
+    var li = document.createElement('li'), a = el('a', null, 'jump-card' + (item === SITE.core ? ' core' : ''));
+    a.href = hrefFor(item);
+    a.appendChild(el('span', item.kind, 'label'));
+    a.appendChild(el('strong', item === SITE.core ? 'About me' : item.title));
+    a.appendChild(el('span', item.blurb));
+    a.addEventListener('click', function () { SITE.track('menu-' + (item.page || item.id), 'Menu: ' + item.title, true); });
     li.appendChild(a); jump.appendChild(li);
   });
-
-  function el(tag, text, cls) { var e = document.createElement(tag); if (text) e.textContent = text; if (cls) e.className = cls; return e; }
 
   function fillProject(p) {
     document.getElementById('pj-kind').textContent = p.kind;
@@ -97,6 +121,7 @@ var SITE = {
       if (a.dataset.nav === name) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
     window.scrollTo(0, 0);
+    SITE.track('/' + (name === 'home' ? '' : key), document.title);
     SITE.onRoute && SITE.onRoute(name);
   }
   window.addEventListener('hashchange', route);
@@ -114,6 +139,58 @@ document.getElementById('copy-email').addEventListener('click', function () {
     navigator.clipboard.writeText(node.textContent).then(function () { done('Copied'); }, function () { select(); done('Press Ctrl+C'); });
   } catch (e) { select(); done('Press Ctrl+C'); }
 });
+
+
+/* ------------------------------------------------------------------
+   Sound: optional, off by default. Everything is synthesised with the
+   Web Audio API, so there are no audio files to download.
+------------------------------------------------------------------- */
+SITE.sfx = (function () {
+  var btn = document.getElementById('sound-toggle');
+  var on = SITE.pref('sound') === 'on', ctx = null, master = null;
+  function ensure() {
+    if (!ctx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      ctx = new AC(); master = ctx.createGain(); master.gain.value = 0.5; master.connect(ctx.destination);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+  function tone(freq, start, dur, vol, type, endFreq) {
+    var o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime + start;
+    o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t);
+    if (endFreq) o.frequency.exponentialRampToValueAtTime(endFreq, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.05);
+  }
+  function noise(start, dur, vol, freq) {
+    var len = Math.ceil(ctx.sampleRate * dur), buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+    var src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    src.buffer = buf; f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 0.9; g.gain.value = vol;
+    src.connect(f); f.connect(g); g.connect(master); src.start(ctx.currentTime + start);
+  }
+  var sounds = {
+    tick: function () { tone(1400, 0, 0.05, 0.12, 'triangle'); },
+    // A stony crack as a piece breaks off.
+    crack: function () { noise(0, 0.14, 0.9, 2200); noise(0.03, 0.22, 0.6, 700); tone(150, 0, 0.18, 0.35, 'sine', 55); },
+    // The cube snapping back together, with a purple shimmer.
+    snap: function () { tone(110, 0, 0.25, 0.45, 'sine', 50); noise(0, 0.08, 0.5, 1200); tone(660, 0.05, 0.9, 0.08); tone(990, 0.09, 0.9, 0.06); tone(1320, 0.13, 0.8, 0.04); },
+    // Soft tap when there's nothing left to break.
+    tap: function () { tone(220, 0, 0.12, 0.2, 'sine', 160); },
+    open: function () { tone(520, 0, 0.12, 0.1, 'triangle'); tone(780, 0.05, 0.16, 0.08, 'triangle'); },
+    secret: function () { [523, 659, 784, 1047, 1319].forEach(function (f, i) { tone(f, i * 0.08, 0.5, 0.1, 'triangle'); }); tone(65, 0, 1.2, 0.3, 'sine', 40); }
+  };
+  function render() { btn.textContent = on ? 'Sound: on' : 'Sound: off'; btn.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+  btn.addEventListener('click', function () {
+    on = !on; SITE.pref('sound', on ? 'on' : 'off'); render();
+    if (on && ensure()) sounds.tick();
+    if (on) SITE.track('sound-on', 'Turned sound on', true);
+  });
+  render();
+  return { play: function (name) { if (on && ensure() && sounds[name]) sounds[name](); } };
+})();
 
 
 /* ------------------------------------------------------------------
@@ -138,6 +215,22 @@ document.getElementById('copy-email').addEventListener('click', function () {
     SITE.route();
     return;
   }
+  // Skip animation: hide the cube and show the plain menu instead. Starts on for reduced-motion visitors.
+  var skipBtn = document.getElementById('skip-toggle');
+  var plain = SITE.pref('plain') ? SITE.pref('plain') === 'on' : reduced;
+  function applyPlain() {
+    document.body.classList.toggle('plain', plain);
+    skipBtn.textContent = plain ? 'Show the cube' : 'Skip animation';
+    skipBtn.setAttribute('aria-pressed', plain ? 'true' : 'false');
+  }
+  applyPlain();
+  skipBtn.addEventListener('click', function () {
+    plain = !plain; SITE.pref('plain', plain ? 'on' : 'off'); applyPlain();
+    if (plain) SITE.track('skip-animation', 'Skipped the animation', true);
+    updateHint();
+    SITE.onRoute('home');
+  });
+
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setClearColor(0x000000, 0);
   renderer.shadowMap.enabled = true;
@@ -383,6 +476,11 @@ document.getElementById('copy-email').addEventListener('click', function () {
       var tone = Math.random() < 0.01 ? VOID_GREY : pBase[i];
       var c = VOID_GREY + (tone - VOID_GREY) * fade;
       pCol[i * 3] = pCol[i * 3 + 1] = pCol[i * 3 + 2] = c;
+      // After the easter egg, every other particle glows purple for a few seconds.
+      if (eggGlow > 0 && i % 2) {
+        var e = eggGlow * fade;
+        pCol[i * 3] = c + (0.54 - c) * e; pCol[i * 3 + 1] = c + (0.24 - c) * e; pCol[i * 3 + 2] = c + (1 - c) * e;
+      }
     }
     pGeo.attributes.position.needsUpdate = true;
     pGeo.attributes.color.needsUpdate = true;
@@ -431,6 +529,7 @@ document.getElementById('copy-email').addEventListener('click', function () {
   var detached = 0;
   function updateHint() {
     var left = frags.length - detached;
+    if (plain) { hint.textContent = 'Animation skipped. Everything is listed below.'; resetBtn.hidden = true; return; }
     if (detached === 0) hint.textContent = 'Click the cube to break off a piece.';
     else if (left > 0) hint.innerHTML = 'Hover a piece to preview it. <b>' + left + (left === 1 ? ' piece' : ' pieces') + '</b> left on the cube.';
     else hint.innerHTML = 'The core is exposed. Click the <b>purple core</b> to read about me.';
@@ -449,7 +548,8 @@ document.getElementById('copy-email').addEventListener('click', function () {
         if (d < best) { best = d; f = x; }
       });
     }
-    if (!f) { nudge = 1; return; }
+    if (!f) { nudge = 1; SITE.sfx.play('tap'); return; }
+    SITE.sfx.play('crack');
     scene.attach(f.group);
     f.fromPos.copy(f.group.position); f.fromQuat.copy(f.group.quaternion); f.fromScale = 1;
     // Push the chunk straight out from the cube first, then send it to the free slot on its own side,
@@ -549,21 +649,50 @@ document.getElementById('copy-email').addEventListener('click', function () {
   });
   canvas.addEventListener('pointerleave', function () { if (!pinned) { preview.hidden = true; hovered = null; setHighlight(null); stage.classList.remove('is-hovering'); } });
 
+  // Easter egg: click the exposed core five times in quick succession. A single click still opens
+  // About me, just a moment later, so the quick clicks can be counted first.
+  var EGG_CLICKS = 5, coreClicks = 0, coreTimer = 0;
+  var eggToast = document.getElementById('egg-toast'), eggT = -1, eggGlow = 0, toastTimer = 0;
+  function secret() {
+    eggT = 0; eggGlow = 1; flashT = 0;
+    hidePreview();
+    SITE.sfx.play('secret');
+    SITE.track('easter-egg', 'Found the easter egg', true);
+    eggToast.textContent = SITE.core.secret || 'You found the secret. Thanks for poking around.';
+    eggToast.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { eggToast.hidden = true; }, 3800);
+  }
+
   canvas.addEventListener('click', function (ev) {
     var p = pick(ev);
-    var touch = ev.pointerType && ev.pointerType !== 'mouse';
+    var touch = ev.pointerType ? ev.pointerType !== 'mouse' : matchMedia('(hover: none)').matches;
     if (!p) { hidePreview(); return; }
     if (p.type === 'cube') { hidePreview(); detachNext(p.frag); return; }
+    if (p.type === 'core') {
+      coreClicks++;
+      clearTimeout(coreTimer);
+      if (coreClicks >= EGG_CLICKS) { coreClicks = 0; secret(); return; }
+      coreTimer = setTimeout(function () { coreClicks = 0; openTarget(p, touch); }, coreClicks > 1 ? 450 : 300);
+      return;
+    }
+    openTarget(p, touch);
+  });
+  function openTarget(p, touch) {
     // Chunk or core: mouse opens straight away; touch shows the preview first.
-    if (touch || (ev.pointerType === undefined && matchMedia('(hover: none)').matches)) {
-      if (pinned && pinned.item === p.item) { location.hash = SITE.hrefFor(p.item); return; }
+    if (touch) {
+      if (pinned && pinned.item === p.item) { go(p); return; }
       pinned = p; setHighlight(p);
       fillPreview(p.item, p.type === 'core');
       preview.hidden = false; preview.classList.add('pinned');
       return;
     }
+    go(p);
+  }
+  function go(p) {
+    SITE.sfx.play('open');
+    SITE.track('cube-' + (p.item.page || p.item.id), 'Cube: ' + p.item.title, true);
     location.hash = SITE.hrefFor(p.item);
-  });
+  }
 
   // Animation
   function ease(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
@@ -625,6 +754,16 @@ document.getElementById('copy-email').addEventListener('click', function () {
     coreLight.distance = 2.4 + 2 * flash;
     seamFlash.value = flash;
 
+    if (eggT >= 0) {
+      // Easter egg: the core does two quick flips and swells, then settles.
+      eggT += dt;
+      var eu = Math.min(1, eggT / 1.4), ek = reduced ? 0 : ease(eu);
+      core.rotation.set(ek * Math.PI * 2, ek * Math.PI * 4, 0);
+      core.scale.setScalar(1 + (reduced ? 0 : Math.sin(eu * Math.PI) * 0.25));
+      if (eu >= 1) { eggT = -1; core.rotation.set(0, 0, 0); core.scale.setScalar(1); }
+    }
+    eggGlow = Math.max(0, eggGlow - dt / 3.5);
+
     frags.forEach(function (f) {
       var g = f.group;
       if (f.mode === 'flying' || f.mode === 'returning') {
@@ -647,6 +786,7 @@ document.getElementById('copy-email').addEventListener('click', function () {
           if (wasReturning && !reduced && !frags.some(function (x) { return x.mode === 'returning'; })) {
             if (POP_ON_REASSEMBLE) popT = 0;
             flashT = 0;
+            SITE.sfx.play('snap');
           }
         }
       } else if (f.mode === 'parked') {
@@ -666,7 +806,7 @@ document.getElementById('copy-email').addEventListener('click', function () {
   }
 
   SITE.onRoute = function (name) {
-    var shouldRun = name === 'home';
+    var shouldRun = name === 'home' && !plain;
     if (shouldRun && !running) { running = true; clock.getDelta(); layout(); requestAnimationFrame(frame); }
     if (!shouldRun) { running = false; hidePreview(); }
   };
